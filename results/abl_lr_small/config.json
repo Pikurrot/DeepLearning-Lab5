@@ -1,0 +1,32 @@
+{
+ "name": "abl_lr_small",
+ "group": "ablation",
+ "widths": [
+  3,
+  8,
+  16,
+  25,
+  35,
+  45,
+  50,
+  55,
+  65,
+  80,
+  110,
+  170,
+  300,
+  550,
+  800
+ ],
+ "epochs": 2000,
+ "noise": 0.0,
+ "reuse": true,
+ "loss": "mse",
+ "lr": 0.002,
+ "momentum": 0.95,
+ "bs": 128,
+ "act": "relu",
+ "init": "glorot",
+ "seed": 0,
+ "subset_seed": 0
+}

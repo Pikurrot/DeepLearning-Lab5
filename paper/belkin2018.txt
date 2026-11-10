@@ -1,0 +1,1093 @@
+Reconciling modern machine learning practice
+and the bias-variance trade-oﬀ
+Mikhail Belkin a, Daniel Hsu b, Siyuan Ma a, and Soumik Mandal a
+aThe Ohio State University, Columbus, OH
+bColumbia University, New York, NY
+September 12, 2019
+Abstract
+Breakthroughs in machine learning are rapidly changing science and society, yet our fun-
+damental understanding of this technology has lagged far behind. Indeed, one of the central
+tenets of the ﬁeld, the bias-variance trade-oﬀ, appears to be at odds with the observed behavior
+of methods used in the modern machine learning practice. The bias-variance trade-oﬀ implies
+that a model should balance under-ﬁtting and over-ﬁtting: rich enough to express underlying
+structure in data, simple enough to avoid ﬁtting spurious patterns. However, in the modern
+practice, very rich models such as neural networks are trained to exactly ﬁt (i.e., interpolate)
+the data. Classically, such models would be considered over-ﬁt, and yet they often obtain high
+accuracy on test data. This apparent contradiction has raised questions about the mathematical
+foundations of machine learning and their relevance to practitioners.
+In this paper, we reconcile the classical understanding and the modern practice within a
+uniﬁed performance curve. This “double descent” curve subsumes the textbook U-shaped bias-
+variance trade-oﬀ curve by showing how increasing model capacity beyond the point of inter-
+polation results in improved performance. We provide evidence for the existence and ubiquity
+of double descent for a wide spectrum of models and datasets, and we posit a mechanism for
+its emergence. This connection between the performance and the structure of machine learning
+models delineates the limits of classical analyses, and has implications for both the theory and
+practice of machine learning.
+E-mail: mbelkin@cse.ohio-state.edu, djhsu@cs.columbia.edu, masi@cse.ohio-state.edu,
+mandal.32@osu.edu
+1
+arXiv:1812.11118v2  [stat.ML]  10 Sep 2019
+1 Introduction
+Machine learning has become key to important applications in science, technology and commerce.
+The focus of machine learning is on the problem of prediction: given a sample of training examples
+(x1,y 1),..., (xn,y n) from Rd× R, we learn a predictor hn : Rd→ R that is used to predict the label
+y of a new point x, unseen in training.
+The predictor hn is commonly chosen from some function class H, such as neural networks
+with a certain architecture, using empirical risk minimization (ERM) and its variants. In ERM,
+the predictor is taken to be a function h ∈ Hthat minimizes the empirical (or training) risk
+1
+n
+∑n
+i=1𝓁(h(xi),y i), where 𝓁 is a loss function, such as the squared loss 𝓁(y′,y ) = ( y′−y)2 for
+regression or zero-one loss 𝓁(y′,y ) = 1{y′⁄=y} for classiﬁcation.
+The goal of machine learning is to ﬁndhn that performs well on new data, unseen in training. To
+study performance on new data (known asgeneralization) we typically assume the training examples
+are sampled randomly from a probability distribution P over Rd× R, and evaluate hn on a new
+test example (x,y ) drawn independently from P . The challenge stems from the mismatch between
+the goals of minimizing the empirical risk (the explicit goal of ERM algorithms, optimization) and
+minimizing the true (or test) risk E(x,y)∼P [𝓁(h(x),y )] (the goal of machine learning).
+Conventional wisdom in machine learning suggests controlling the capacity of the function class
+H based on the bias-variance trade-oﬀ by balancing under-ﬁtting and over-ﬁtting (cf., [17, 21]):
+1. IfH is too small, all predictors inH may under-ﬁt the training data (i.e., have large empirical
+risk) and hence predict poorly on new data.
+2. If H is too large, the empirical risk minimizer may over-ﬁt spurious patterns in the training
+data resulting in poor accuracy on new examples (small empirical risk but large true risk).
+The classical thinking is concerned with ﬁnding the “sweet spot” between under-ﬁtting and over-
+ﬁtting. The control of the function class capacity may be explicit, via the choice of H (e.g., picking
+the neural network architecture), or it may be implicit, using regularization (e.g., early stopping).
+When a suitable balance is achieved, the performance ofhn on the training data is said to generalize
+to the population P . This is summarized in the classical U-shaped risk curve, shown in Figure 1(a)
+that has been widely used to guide model selection and is even thought to describe aspects of human
+decision making [18]. The textbook corollary of this curve is that “a model with zero training error
+is overﬁt to the training data and will typically generalize poorly” [21, page 221], a view still widely
+accepted.
+Yet, practitioners routinely use modern machine learning methods, such as large neural networks
+and other non-linear predictors that have very low or zero training risk. In spite of the high
+function class capacity and near-perfect ﬁt to training data, these predictors often give very accurate
+predictions on new data. Indeed, this behavior has guided a best practice in deep learning for
+choosing neural network architectures, speciﬁcally that the network should be large enough to
+permit eﬀortless zero loss training (called interpolation) of the training data [34]. Moreover, in
+direct challenge to the bias-variance trade-oﬀ philosophy, recent empirical evidence indicates that
+neural networks and kernel machines trained to interpolate the training data obtain near-optimal
+test results even when the training data are corrupted with high levels of noise [42, 4].
+The main ﬁnding of this work is a pattern for how performance on unseen data depends on model
+capacity and the mechanism underlying its emergence. This dependence, empirically witnessed with
+important model classes including neural networks and a range of datasets, is summarized in the
+“double descent” risk curve shown in Figure 1(b). The curve subsumes the classical U-shaped risk
+curve from Figure 1(a) by extending it beyond the point of interpolation.
+2
+Risk
+Training risk
+Test risk
+Capacity of H
+sweet spot
+under-fitting
+over-fitting
+Risk
+Training risk
+Test risk
+Capacity of H
+under-parameterized
+“modern”
+interpolating regime
+interpolation threshold
+over-parameterized
+“classical”
+regime
+(a) (b)
+Figure 1: Curves for training risk (dashed line) and test risk (solid line). (a) The classical
+U-shaped risk curve arising from the bias-variance trade-oﬀ. ( b) The double descent risk curve ,
+which incorporates the U-shaped risk curve (i.e., the “classical” regime) together with the observed
+behavior from using high capacity function classes (i.e., the “modern” interpolating regime), sep-
+arated by the interpolation threshold. The predictors to the right of the interpolation threshold
+have zero training risk.
+When function class capacity is below the “interpolation threshold”, learned predictors exhibit
+the classical U-shaped curve from Figure 1(a). (In this paper, function class capacity is identiﬁed
+with the number of parameters needed to specify a function within the class.) The bottom of the
+U is achieved at the sweet spot which balances the ﬁt to the training data and the susceptibility
+to over-ﬁtting: to the left of the sweet spot, predictors are under-ﬁt, and immediately to the
+right, predictors are over-ﬁt. When we increase the function class capacity high enough (e.g.,
+by increasing the number of features or the size of the neural network architecture), the learned
+predictors achieve (near) perfect ﬁts to the training data—i.e., interpolation. Although the learned
+predictors obtained at the interpolation threshold typically have high risk, we show that increasing
+the function class capacity beyond this point leads to decreasing risk, typically going below the risk
+achieved at the sweet spot in the “classical” regime.
+All of the learned predictors to the right of the interpolation threshold ﬁt the training data
+perfectly and have zero empirical risk. So why should some—in particular, those from richer
+functions classes—have lower test risk than others? The answer is that the capacity of the function
+class does not necessarily reﬂect how well the predictor matches the inductive bias appropriate for
+the problem at hand. For the learning problems we consider (a range of real-world datasets as well
+as synthetic data), the inductive bias that seems appropriate is the regularity or smoothness of
+a function as measured by a certain function space norm. Choosing the smoothest function that
+perfectly ﬁts observed data is a form of Occam’s razor: the simplest explanation compatible with
+the observations should be preferred (cf. [38, 6]). By considering larger function classes, which
+contain more candidate predictors compatible with the data, we are able to ﬁnd interpolating
+functions that have smaller norm and are thus “simpler”. Thus increasing function class capacity
+improves performance of classiﬁers.
+Related ideas have been considered in the context of margins theory [38, 2, 35], where a larger
+function classH may permit the discovery of a classiﬁer with a larger margin. While the margins
+theory can be used to study classiﬁcation, it does not apply to regression, and also does not pre-
+dict the second descent beyond the interpolation threshold. Recently, there has been an emerging
+recognition that certain interpolating predictors (not based on ERM) can indeed be provably sta-
+tistically optimal or near-optimal [3, 5], which is compatible with our empirical observations in the
+interpolating regime.
+In the remainder of this article, we discuss empirical evidence for the double descent curve, the
+3
+mechanism for its emergence and conclude with some ﬁnal observations and parting thoughts.
+2 Neural networks
+In this section, we discuss the double descent risk curve in the context of neural networks.
+Random F ourier features. We ﬁrst consider a popular class of non-linear parametric models
+called Random Fourier Features (RFF) [30], which can be viewed as a class of two-layer neural
+networks with ﬁxed weights in the ﬁrst layer. The RFF model familyHN withN (complex-valued)
+parameters consists of functions h: Rd→ C of the form
+h(x) =
+N∑
+k=1
+akφ(x;vk) where φ(x;v) :=e
+√−1⟨v,x⟩,
+and the vectorsv1,...,v N are sampled independently from the standard normal distribution in Rd.
+(We considerHN as a class of real-valued functions with 2N real-valued parameters by taking real
+and imaginary parts separately.) Note thatHN is a randomized function class, but as N→∞ , the
+function class becomes a closer and closer approximation to the Reproducing Kernel Hilbert Space
+(RKHS) corresponding to the Gaussian kernel, denoted by H∞. While it is possible to directly
+useH∞ (e.g., as is done with kernel machines [8]), the random classes HN are computationally
+attractive to use when the sample sizen is large but the number of parametersN is small compared
+to n.
+Our learning procedure using HN is as follows. Given data ( x1,y 1),..., (xn,y n) from Rd× R,
+we ﬁnd the predictor hn,N∈H N via ERM with squared loss. That is, we minimize the empirical
+risk objective 1 n ∑n i=1(h(xi)−yi)2 over all functions h∈H N. When the minimizer is not unique
+(as is always the case when N >n), we choose the minimizer whose coeﬃcients ( a1,...,a N) have
+the minimum 𝓁2 norm. This choice of norm is intended as an approximation to the RKHS norm
+‖h‖H∞, which is generally diﬃcult to compute for arbitrary functions in HN. For problems with
+multiple outputs (e.g., multi-class classiﬁcation), we use functions with vector-valued outputs and
+sum of the squared losses for each output.
+In Figure 2, we show the test risk of the predictors learned usingHN on a subset of the popular
+data set of handwritten digits called MNIST. The same ﬁgure also shows the𝓁2 norm of the function
+coeﬃcients, as well as the training risk. We see that for small values of N, the test risk shows the
+classical U-shaped curve consistent with the bias-variance trade-oﬀ, with a peak occurring at the
+interpolation threshold N = n. Some statistical analyses of RFF suggest choosing N∝√n logn
+to obtain good test risk guarantees [32].
+The interpolation regime connected with modern practice is shown to the right of the interpo-
+lation threshold, with N≥n. The model class that achieves interpolation with fewest parameters
+(N =n random features) yields the least accurate predictor. (In fact, it has no predictive ability
+for classiﬁcation.) But as the number of features increases beyond n, the accuracy improves dra-
+matically, exceeding that of the predictor corresponding to the bottom of the U-shaped curve. The
+plot also shows that the predictor hn,∞ obtained fromH∞ (the kernel machine) out-performs the
+predictors fromHN for any ﬁnite N.
+What structural mechanisms account for the double descent shape? When the number of
+features is much smaller then the sample size,N≪n, classical statistical arguments imply that the
+training risk is close to the test risk. Thus, for smallN, adding more features yields improvements in
+both the training and test risks. However, as the number of features approachesn (the interpolation
+4
+0 10 20 30 40 50 60
+2
+15
+88
+4
+Test (%)
+Zero-one loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+0
+1
+10
+100
+1709Test
+Squared loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+7
+447
+62
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+7
+447
+62
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0
+8
+14
+Train (%)
+RFF
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0.0
+0.2
+0.4
+Train
+RFF
+Figure 2: Double descent risk curve for RFF model on MNIST. Test risks (log scale),
+coeﬃcient 𝓁2 norms (log scale), and training risks of the RFF model predictors hn,N learned on a
+subset of MNIST (n = 104, 10 classes). The interpolation threshold is achieved at N = 104.
+5
+-3 -2 -1 0 1 2 3
+x
+-6
+-4
+-2
+0
+2
+4
+6
+8
+10
+N=40 ReLU features
+N=4000 ReLU features
+Figure 3: Plot of two univariate functions ﬁtted to 10 data points using Random ReLU features
+φ(x; (v1,v 2)) := max(v1x +v2, 0). The data points are shown in red circles. The ﬁtted function
+with N = 40 Random ReLU features is the blue dashed line; the coeﬃcient vector’s norm (scaled
+by
+√
+N) is ≈ 695. The ﬁtted function with N = 4000 Random ReLU features is the black solid
+line; the coeﬃcient vector’s norm is ≈ 159.
+threshold), features not present or only weakly present in the data are forced to ﬁt the training data
+nearly perfectly. This results in classical over-ﬁtting as predicted by the bias-variance trade-oﬀ and
+prominently manifested at the peak of the curve, where the ﬁt becomes exact.
+To the right of the interpolation threshold, all function classes are rich enough to achieve zero
+training risk. For the classes HN that we consider, there is no guarantee that the most regular,
+smallest norm predictor consistent with training data (namely hn,∞, which is inH∞) is contained
+in the class HN for any ﬁnite N. But increasing N allows us to construct progressively better
+approximations to that smallest norm function. Thus we expect to have learned predictors with
+largest norm at the interpolation threshold and for the norm of hn,N to decrease monotonically
+as N increases thus explaining the second descent segment of the curve. This is what we observe
+in Figure 2, and indeed hn,∞ has better accuracy than all hn,N for any ﬁnite N. Favoring small
+norm interpolating predictors turns out to be a powerful inductive bias on MNIST and other real
+and synthetic data sets [4]. For noiseless data, we make this claim mathematically precise in
+Appendix A.
+Additional empirical evidence for the same double descent behavior using other data sets is
+presented in Appendix C.1. For instance, we demonstrate double descent for rectiﬁed linear unit
+(ReLU) random feature models, a class of ReLU neural networks with a setting similar to that of
+RFF. The inductive bias corresponding to the larger number of features can be readily observed
+in a one-dimensional example in Figure 3. Although the ﬁtted function is non-smooth (piecewise
+linear) for any number of Random ReLU features, it appears smoother—with smaller norm—as
+the number of features is increased.
+Finally, in Appendix C.4, we also describe a simple synthetic model, which can be regarded as
+a one-dimensional version of the RFF model, where we observe the same double descent behavior.
+Neural networks and backpropagation. In general multilayer neural networks (beyond RFF
+or ReLU random feature models), a learning algorithm will tune all of the weights to ﬁt the training
+6
+data, typically using versions of stochastic gradient descent (SGD), with backpropagation to com-
+pute partial derivatives. This ﬂexibility increases the representational power of neural networks,
+but also makes ERM generally more diﬃcult to implement. Nevertheless, as shown in Figure 4,
+we observe that increasing the number of parameters in fully connected two-layer neural networks
+leads to a risk curve qualitatively similar to that observed with RFF models. That the test risk
+improves beyond the interpolation threshold is compatible with the conjectured “small norm” in-
+ductive biases of the common training algorithms for neural networks [20, 25]. We note that this
+transition from under- to over-parameterized regimes for neural networks was also previously ob-
+served by [7, 1, 27, 37]. In particular, [37] draws a connection to the physical phenomenon of
+“jamming” in particle systems.
+The computational complexity of ERM with neural networks makes the double descent risk
+curve diﬃcult to observe. Indeed, in the classical under-parametrized regime ( N≪ n), the non-
+convexity of the ERM optimization problem causes the behavior of local search-based heuristics,
+like SGD, to be highly sensitive to their initialization. Thus, if only suboptimal solutions are found
+for the ERM optimization problems, increasing the size of a neural network architecture may not
+always lead to a corresponding decrease in the training risk. This suboptimal behavior can lead to
+high variability in both the training and test risks that masks the double descent curve.
+It is common to use neural networks with extremely large number of parameters [11]. But to
+achieve interpolation for a single output (regression or two class classiﬁcation) one expects to need
+at least as many parameters as there are data points. Moreover, if the prediction problem has more
+than one output (as in multi-class classiﬁcation), then the number of parameters needed should be
+multiplied by the number of outputs. This is indeed the case empirically for neural networks shown
+in Figure 4. Thus, for instance, data sets as large as ImageNet [33], which has ∼106 examples and
+∼103 classes, may require networks with ∼109 parameters to achieve interpolation; this is larger
+than many neural network models for ImageNet [11]. In such cases, the classical regime of the
+U-shaped risk curve is more appropriate to understand generalization. For smaller data sets, these
+large neural networks would be ﬁrmly in the over-parametrized regime, and simply training to
+obtain zero training risk often results in good test performance [42].
+Additional results with neural networks are given in Appendix C.3.
+3 Decision trees and ensemble methods
+Does the double descent risk curve manifest with other prediction methods besides neural networks?
+We give empirical evidence that the families of functions explored by boosting with decision trees
+and Random Forests also show similar generalization behavior as neural nets, both before and after
+the interpolation threshold.
+AdaBoost and Random Forests have recently been investigated in the interpolation regime by
+[41] for classiﬁcation. In particular, they give empirical evidence that, when AdaBoost and Random
+Forests are used with maximally large (interpolating) decision trees, the ﬂexibility of the ﬁtting
+methods yield interpolating predictors that are more robust to noise in the training data than
+the predictors produced by rigid, non-interpolating methods (e.g., AdaBoost or Random Forests
+with shallow trees). This in turn is said to yield better generalization. The averaging of the (near)
+interpolating trees ensures that the resulting function is substantially smoother than any individual
+tree, which aligns with an inductive bias that is compatible with many real world problems.
+We can understand these ﬂexible ﬁtting methods in the context of the double descent risk curve.
+Observe that the size of a decision tree (controlled by the number of leaves) is a natural way to
+parametrize the function class capacity: trees with only two leaves correspond to two-piecewise
+7
+0
+20
+40
+60
+Zero-one loss (%)
+Test
+Train
+3 10 40 100 300 800
+Number of parameters/weights (×103)
+0.0
+0.2
+0.4
+0.6Squared loss 
+Test
+Train
+Figure 4: Double descent risk curve for fully connected neural network on MNIST.
+Training and test risks of network with a single layer of H hidden units, learned on a subset of
+MNIST (n = 4·103,d = 784,K = 10 classes). The number of parameters is (d+1)·H +(H +1)·K.
+The interpolation threshold (black dotted line) is observed at n·K.
+8
+0.00
+0.02
+0.04
+Squared loss
+Test
+Train
+10/1 1000/1 2000/1
+0
+10
+20
+30
+Zero-one loss (%)
+2000/10 2000/20
+Model parameters: Nmax leaf / Ntree
+Figure 5: Double descent risk curve for random forests on MNIST. The double descent
+risk curve is observed for random forests with increasing model complexity trained on a subset of
+MNIST (n = 10 4, 10 classes). Its complexity is controlled by the number of trees Ntree and the
+maximum number of leaves allowed for each tree N max leaf .
+9
+constant functions with axis-aligned boundary, while trees with n leaves can interpolate n training
+examples. It is a classical observation that the U-shaped bias-variance trade-oﬀ curve manifests in
+many problems when the class capacity is considered this way [21]. (The interpolation threshold
+may be reached with fewer than n leaves in many cases, but n is clearly an upper bound.) To
+further enlarge the function class, we consider ensembles (averages) of several interpolating trees. 1
+So, beyond the interpolation threshold, we use the number of such trees to index the class capacity.
+When we view the risk curve as a function of class capacity deﬁned in this hybrid fashion, we see
+the double descent curve appear just as with neural networks; see Figure 5 and Appendix D. We
+observe a similar phenomenon using L2-boosting [15, 10], another popular ensemble method; the
+results are reported in Appendix E.
+4 Concluding thoughts
+The double descent risk curve introduced in this paper reconciles the U-shaped curve predicted
+by the bias-variance trade-oﬀ and the observed behavior of rich models used in modern machine
+learning practice. The posited mechanism that underlies its emergence is based on common induc-
+tive biases, and hence can explain its appearance (and, we argue, ubiquity) in machine learning
+applications.
+We conclude with some ﬁnal remarks.
+Historical absence. The double descent behavior may have been historically overlooked on
+account of several cultural and practical barriers. Observing the double descent curve requires a
+parametric family of spaces with functions of arbitrary complexity. The linear settings studied
+extensively in classical statistics usually assume a small, ﬁxed set of features and hence ﬁxed ﬁtting
+capacity. Richer families of function classes are typically used in the context of non-parametric
+statistics, where smoothing and regularization are almost always employed [39]. Regularization, of
+all forms, can both prevent interpolation and change the eﬀective capacity of the function class,
+thus attenuating or masking the interpolation peak.
+The RFF model is a popular and ﬂexible parametric family. However, these models were orig-
+inally proposed as computationally favorable alternative to kernel machines. This computational
+advantage over traditional kernel methods holds only for N≪n, and hence models at or beyond
+the interpolation threshold are typically not considered.
+The situation with general multilayer neural networks, is slightly diﬀerent and more involved.
+Due to the non-convexity of the ERM optimization problem, solutions in the classical under-
+parametrized regime are highly sensitive to initialization. Moreover, as we have seen, the peak
+at the interpolation threshold is observed within a narrow range of parameters. Sampling of the
+parameter space that misses that range may lead to the misleading impression that increasing the
+size of the network simply improves performance. Finally, in practice, training of neural networks is
+typically stopped as soon as (an estimate of) the test risk fails to improve. This early stopping has
+a strong regularizing eﬀect that, as discussed above, makes it diﬃcult to observe the interpolation
+peak.
+Inductive bias. In this paper, we have dealt with several types of methods for choosing inter-
+polating solutions. For Random Fourier and Random ReLU features, solutions are constructed
+explicitly by minimum norm linear regression in the feature space. As the number of features tends
+1These trees are trained in the way proposed in Random Forest except without bootstrap re-sampling. This is
+similar to the PERT method of [14].
+10
+to inﬁnity they approach the minimum functional norm solution in the Reproducing Kernel Hilbert
+Space, a solution which maximizes functional smoothness subject to the interpolation constraints.
+For neural networks, the inductive bias owes to the speciﬁc training procedure used, which is typi-
+cally SGD. When all but the ﬁnal layer of the network are ﬁxed (as in RFF models), SGD initialized
+at zero also converges to the minimum norm solution. While the behavior of SGD for more general
+neural networks is not fully understood, there is signiﬁcant empirical and some theoretical evidence
+(e.g., [20]) that a similar minimum norm inductive bias is present. Yet another type of inductive
+bias related to averaging is used in random forests. Averaging potentially non-smooth interpolating
+trees leads to an interpolating solution with a higher degree of smoothness; this averaged solution
+performs better than any individual interpolating tree.
+Remarkably, for kernel machines all three methods lead to the same minimum norm solution.
+Indeed, the minimum norm interpolating classiﬁer, hn,∞, can be obtained directly by explicit
+norm minimization (solving an explicit system of linear equations), through SGD or by averaging
+trajectories of Gaussian processes (computing the posterior mean [31]).
+Optimization and practical considerations. In our experiments, appropriately chosen “mod-
+ern” models usually outperform the optimal “classical” model on the test set. But another im-
+portant practical advantage of over-parametrized models is in optimization. There is a growing
+understanding that larger models are “easy” to optimize as local methods, such as SGD, converge
+to global minima of the training risk in over-parametrized regimes (e.g., [36]). Thus, large inter-
+polating models can have low test risk and be easy to optimize at the same time, in particular
+with SGD [26]. It is likely that the models to the left of the interpolation peak have optimiza-
+tion properties qualitatively diﬀerent from those to the right, a distinction of signiﬁcant practical
+import.
+Outlook. The classical U-shaped bias-variance trade-oﬀ curve has shaped our view of model
+selection and directed applications of learning algorithms in practice. The understanding of model
+performance developed in this work delineates the limits of classical analyses and opens new lines
+of enquiry to study and compare computational, statistical, and mathematical properties of the
+classical and modern regimes in machine learning. We hope that this perspective, in turn, will help
+practitioners choose models and algorithms for optimal performance.
+Acknowledgments
+We thank Peter Bickel for editing the PNAS submission, and the anonymous reviewers for their
+helpful feedback. Mikhail Belkin, Siyuan Ma and Soumik Mandal were supported by NSF RI-
+1815697. Daniel Hsu was supported by NSF CCF-1740833 and Sloan Research Fellowship. We
+thank Nvidia for donating GPUs used for this research.
+References
+[1] Madhu S Advani and Andrew M Saxe. High-dimensional dynamics of generalization error in
+neural networks. arXiv preprint arXiv:1710.03667 , 2017.
+[2] Peter L. Bartlett. The sample complexity of pattern classiﬁcation with neural networks: the
+size of the weights is more important than the size of the network. IEEE Transactions on
+Information Theory, 44(2):525–536, 1998.
+11
+[3] Mikhail Belkin, Daniel Hsu, and Partha Mitra. Overﬁtting or perfect ﬁtting? risk bounds
+for classiﬁcation and regression rules that interpolate. In Advances in Neural Information
+Processing Systems, pages 2306–2317, 2018.
+[4] Mikhail Belkin, Siyuan Ma, and Soumik Mandal. To understand deep learning we need to
+understand kernel learning. In Proceedings of the 35th International Conference on Machine
+Learning, volume 80 of Proceedings of Machine Learning Research, pages 541–549, 2018.
+[5] Mikhail Belkin, Alexander Rakhlin, and Alexandre B Tsybakov.
+https://arxiv.org/abs/1806.09471, 2018.
+[6] Anselm Blumer, Andrzej Ehrenfeucht, David Haussler, and Manfred K Warmuth. Occam’s
+razor. Information processing letters, 24(6):377–380, 1987.
+[7] Siegfried B¨ os and Manfred Opper. Dynamics of training. In Advances in Neural Information
+Processing Systems, pages 141–147, 1997.
+[8] Bernhard E Boser, Isabelle M Guyon, and Vladimir N Vapnik. A training algorithm for
+optimal margin classiﬁers. In Proceedings of the ﬁfth annual workshop on Computational
+learning theory, pages 144–152. ACM, 1992.
+[9] Leo Breiman. Random forests. Machine learning, 45(1):5–32, 2001.
+[10] Peter B¨ uhlmann and Bin Yu. Boosting with thel2 loss: regression and classiﬁcation. Journal
+of the American Statistical Association , 98(462):324–339, 2003.
+[11] Alfredo Canziani, Adam Paszke, and Eugenio Culurciello. An analysis of deep neural network
+models for practical applications. arXiv preprint arXiv:1605.07678 , 2016.
+[12] Youngmin Cho and Lawrence K. Saul. Kernel methods for deep learning. In Advances in
+Neural Information Processing Systems, pages 342–350, 2009.
+[13] Fran¸ cois Chollet et al. Keras. https://keras.io, 2015.
+[14] Adele Cutler and Guohua Zhao. Pert-perfect random tree ensembles. Computing Science and
+Statistics, 33:490–497, 2001.
+[15] Jerome H Friedman. Greedy function approximation: a gradient boosting machine. Annals of
+Statistics, pages 1189–1232, 2001.
+[16] John S Garofolo, Lori F Lamel, William M Fisher, Jonathon G Fiscus, and David S Pallett.
+Darpa timit acoustic-phonetic continous speech corpus cd-rom. NIST speech disc, 1-1.1, 1993.
+[17] Stuart Geman, Elie Bienenstock, and Ren Doursat. Neural networks and the bias/variance
+dilemma. Neural Computation, 4(1):1–58, 1992. doi: 10.1162/neco.1992.4.1.1. URL https:
+//doi.org/10.1162/neco.1992.4.1.1.
+[18] Gerd Gigerenzer and Henry Brighton. Homo heuristicus: Why biased minds make better
+inferences. Topics in cognitive science, 1(1):107–143, 2009.
+[19] Xavier Glorot and Yoshua Bengio. Understanding the diﬃculty of training deep feedforward
+neural networks. In Proceedings of the thirteenth international conference on artiﬁcial intelli-
+gence and statistics , pages 249–256, 2010.
+12
+[20] Suriya Gunasekar, Blake E Woodworth, Srinadh Bhojanapalli, Behnam Neyshabur, and Nati
+Srebro. Implicit regularization in matrix factorization. In Advances in Neural Information
+Processing Systems, pages 6151–6159, 2017.
+[21] Trevor Hastie, Robert Tibshirani, and Jerome Friedman. The Elements of Statistical Learning,
+volume 1. Springer, 2001.
+[22] Alex Krizhevsky and Geoﬀrey Hinton. Learning multiple layers of features from tiny images.
+Master’s thesis, University of Toronto, 2009.
+[23] Ken Lang. Newsweeder: Learning to ﬁlter netnews. In Machine Learning Proceedings, pages
+331–339. Elsevier, 1995.
+[24] Y. LeCun, L. Bottou, Y. Bengio, and P. Haﬀner. Gradient-based learning applied to document
+recognition. In Proceedings of the IEEE, volume 86, pages 2278–2324, 1998.
+[25] Yuanzhi Li, Tengyu Ma, and Hongyang Zhang. Algorithmic regularization in over-
+parameterized matrix sensing and neural networks with quadratic activations. In Proceedings
+of the 31st Conference On Learning Theory , volume 75 of Proceedings of Machine Learning
+Research, pages 2–47, 06–09 Jul 2018.
+[26] Siyuan Ma, Raef Bassily, and Mikhail Belkin. The power of interpolation: Understanding
+the eﬀectiveness of SGD in modern over-parametrized learning. In Jennifer Dy and Andreas
+Krause, editors, Proceedings of the 35th International Conference on Machine Learning , vol-
+ume 80 of Proceedings of Machine Learning Research , pages 3325–3334, Stockholmsmssan,
+Stockholm Sweden, 10–15 Jul 2018. PMLR. URL http://proceedings.mlr.press/v80/
+ma18a.html.
+[27] Brady Neal, Sarthak Mittal, Aristide Baratin, Vinayak Tantia, Matthew Scicluna, Simon
+Lacoste-Julien, and Ioannis Mitliagkas. A modern take on the bias-variance tradeoﬀ in neural
+networks. arXiv preprint arXiv:1810.08591 , 2018.
+[28] Y. Netzer, T. Wang, A. Coates, A. Bissacco, B. Wu, and A. Ng. Reading digits in natural
+images with unsupervised feature learning. In NIPS workshop, volume 2011, page 4, 2011.
+[29] Jeﬀrey Pennington, Richard Socher, and Christopher Manning. Glove: Global vectors for
+word representation. In Proceedings of the 2014 conference on empirical methods in natural
+language processing, pages 1532–1543, 2014.
+[30] Ali Rahimi and Benjamin Recht. Random features for large-scale kernel machines. In Advances
+in Neural Information Processing Systems , pages 1177–1184, 2008.
+[31] Carl Edward Rasmussen. Gaussian processes in machine learning. In Advanced Lectures on
+Machine Learning, pages 63–71. Springer, 2004.
+[32] Alessandro Rudi and Lorenzo Rosasco. Generalization properties of learning with random
+features. In Advances in Neural Information Processing Systems , pages 3215–3225, 2017.
+[33] Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, Sanjeev Satheesh, Sean Ma, Zhiheng
+Huang, Andrej Karpathy, Aditya Khosla, Michael Bernstein, Alexander C. Berg, and Li Fei-
+Fei. ImageNet Large Scale Visual Recognition Challenge. International Journal of Computer
+Vision, 115(3):211–252, 2015. doi: 10.1007/s11263-015-0816-y.
+13
+[34] Ruslan Salakhutdinov. Deep learning tutorial at the Simons Institute, Berkeley,
+https://simons.berkeley.edu/talks/ruslan-salakhutdinov-01-26-2017-1, 2017.
+[35] Robert E. Schapire, Yoav Freund, Peter Bartlett, and Wee Sun Lee. Boosting the margin: a
+new explanation for the eﬀectiveness of voting methods. Ann. Statist., 26(5):1651–1686, 1998.
+[36] Mahdi Soltanolkotabi, Adel Javanmard, and Jason D Lee. Theoretical insights into the op-
+timization landscape of over-parameterized shallow neural networks. IEEE Transactions on
+Information Theory, 2018.
+[37] Stefano Spigler, Mario Geiger, St´ ephane d’Ascoli, Levent Sagun, Giulio Biroli, and Matthieu
+Wyart. A jamming transition from under-to over-parametrization aﬀects loss landscape and
+generalization. arXiv preprint arXiv:1810.09665 , 2018.
+[38] Vladimir N. Vapnik. The Nature of Statistical Learning Theory . Springer, 1995. ISBN 0-387-
+94559-8.
+[39] Larry Wasserman. All of Nonparametric Statistics . Springer, 2006.
+[40] Holger Wendland. Scattered Data Approximation . Cambridge Monographs on Applied
+and Computational Mathematics. Cambridge University Press, 2004. doi: 10.1017/
+CBO9780511617539.
+[41] Abraham J Wyner, Matthew Olson, Justin Bleich, and David Mease. Explaining the success
+of adaboost and random forests as interpolating classiﬁers. Journal of Machine Learning
+Research, 18(48):1–33, 2017.
+[42] Chiyuan Zhang, Samy Bengio, Moritz Hardt, Benjamin Recht, and Oriol Vinyals. Understand-
+ing deep learning requires rethinking generalization. In International Conference on Learning
+Representations, 2017.
+A Approximation theorem
+Suppose the training data (x1,y 1),..., (xn,y n) are sampled independently by drawingxi uniformly
+from a compact domain in Rd, and assigning the label yi =h∗(xi) using a target functionh∗∈H∞.
+Let h∈H∞ be another hypothesis that interpolates the training data ( x1,y 1),..., (xn,y n). The
+following theorem bounds the error of h in approximating h∗.
+Theorem 1. Fix any h∗∈H∞. Let (x1,y 1),..., (xn,y n) be independent and identically distributed
+random variables, where xi is drawn uniformly at random from a compact cube 2 Ω⊂ Rd, and
+yi = h∗(xi) for all i. There exists absolute constants A,B > 0 such that, for any interpolating
+h∈H∞ (i.e., h(xi) =yi for all i), so that with high probability
+sup
+x∈Ω
+|h(x)−h∗(x)|<Ae−B(n/ log n)1/d (‖h∗‖H∞ +‖h‖H∞).
+Proof sketch. Recall that the ﬁll κn of the set of points x1,...,x n in Ω is a measure of how well
+these points cover Ω: κn = maxx∈Ω minxj∈{x1,...,xn}‖x−xj‖. It is easy to verify (e.g., by taking an
+2Same argument can be used for more general domains and probability distributions.
+14
+appropriate grid partition of the cube Ω and applying the union bound) that with high probability
+κn =O(n/ logn)−1/d.
+Consider now a function f(x) :=h(x)−h∗(x). We observe that f(xi) = 0 and by the triangle
+inequality‖f‖H∞≤‖h∗‖H∞ +‖h‖H∞. Applying Theorem 11.22 in [40] to f yields the result.
+The minimum norm interpolating function hn,∞ has norm no larger than that of h∗ (by deﬁni-
+tion) and hence achieves the smallest bound in Theorem 1. While these bounds apply only in the
+noiseless setting, they provide a justiﬁcation for the inductive bias based on choosing a solution
+with a small norm. Indeed, there is signiﬁcant empirical evidence that minimum norm interpolating
+solutions generalize well on a variety of datasets, even in the presence of large amounts of label
+noise [4].
+B Experimental setup
+To demonstrate the double descent risk curve, we train a number of representative models including
+neural networks, kernel machines and ensemble methods on several widely used datasets that involve
+images, speech, and text.
+Datasets. Table 1 describes the datasets we use in our experiments. These datasets are for
+classiﬁcation problems with more than two classes, so we adopt the one-versus-rest strategy that
+maps a multi-class label to a binary label vector (one-hot encoding). For the image datasets—
+namely MNIST [24], CIFAR-10 [22], and SVHN [28]—color images are ﬁrst transformed to grayscale
+images, and then the maximum range of each feature is scaled to the interval [0 , 1]. For the
+speech dataset TIMIT [16], we normalize each feature by its z-score. For the text dataset 20-
+Newsgroups [23], we transform each sparse feature vector (bag of words) into a dense feature vector
+by summing up its corresponding word embeddings obtained from [29].
+For each dataset, we subsample a training set (of size n) uniformly at random without replace-
+ment. For the 20-Newsgroups dataset, which does not have a test set provided, we randomly pick
+1/8 of the full dataset for use as a test set.
+Model training. Each model is trained to minimize the squared loss on the given training
+set. Without regularization, such model is able to interpolate the training set when its capacity
+surpasses certain threshold (interpolation threshold). For comparison, we report the test/train
+risk for zero-one and squared loss. In experiments for neural networks and ensemble methods, we
+repeat the same experiment ﬁve times and report the mean for the risks. RFF and Random ReLU
+experimental results were reported based on a single run as the results were empirically highly
+consistent.
+Table 1: Descriptions of datasets. In experiments, we use subsets to reduce the computational cost.
+Dataset Size of full training set Feature dimension (d) Number of classes
+CIFAR-10 5· 104 1024 10
+MNIST 6· 104 784 10
+SVHN 7.3· 104 1024 10
+TIMIT 1.1· 106 440 48
+20-Newsgroups 1.6· 104 100 20
+15
+0 10 20 30 40 50 60
+60
+73
+89
+69
+Test (%)
+CIFAR-10, Zero-one loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+50
+89
+95
+57
+Test (%)
+20Newsgroup, Zero-one loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+4
+1333
+140
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+1
+1494
+128
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0
+30
+66
+Train (%)
+RFF
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0
+45
+88
+Train (%)
+RFF
+Figure 6: Double descent risk curve for RFF model. Test risks (log scale), coeﬃcient𝓁2 norms
+(log scale), and training risks of the RFF model predictors hn,N learned on subsets of CIFAR-10
+and 20Newsgroups (n = 104). The interpolation threshold is achieved at N = 104.
+16
+0 10 20 30 40 50 60
+47
+75
+97
+52
+Test (%)
+TIMIT, Zero-one loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+27
+63
+88
+42
+Test (%)
+SVHN, Zero-one loss
+RFF
+Min. norm solution hn,
+(original kernel)
+0 10 20 30 40 50 60
+3
+1516
+177
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+5
+1106
+119
+Norm 
+ RFF
+Min. norm solution hn,
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0
+40
+73
+Train (%)
+RFF
+0 10 20 30 40 50 60
+Number of Random Fourier Features (×103) (N)
+0
+30
+60
+Train (%)
+RFF
+Figure 7: Double descent risk curve for RFF model. Test risks (log scale), coeﬃcient 𝓁2
+norms (log scale), and training risks of RFF model predictors hn,N learned on subsets of TIMIT
+and SVHN (n = 104). The interpolation threshold is achieved at N = 104.
+17
+0 10 20 30 40 50 60
+2
+50
+86
+4
+Test (%)
+MNIST, Zero-one loss
+0 10 20 30 40 50 60
+30
+77
+67
+36
+Test (%)
+SVHN, Zero-one loss
+0 10 20 30 40 50 60
+4
+48
+4
+Norm 
+0 10 20 30 40 50 60
+3
+336
+15
+Norm 
+0 10 20 30 40 50 60
+Number of Random RELU Features (×103) (N)
+0
+20
+40
+51
+Train (%)
+0 10 20 30 40 50 60
+Number of Random RELU Features (×103) (N)
+0
+25
+50
+78
+Train (%)
+Figure 8: Double descent risk curve for Random ReLU model. Test risks (log scale),
+coeﬃcient 𝓁2 norms (log scale), and training risks of the Random ReLU Features model predictors
+hn,N learned on subsets of MNIST and SVHN data ( n = 10 4). The interpolation threshold is
+achieved at N = 104. Regularization of 4 · 10−6 is added for SVHN to ensure numerical stability
+near interpolation threshold.
+C Additional experimental results for neural networks
+C.1 Random Fourier Feature models
+We provide additional experimental results for several real-world datasets. Figure 6 illustrates
+double descent behavior for CIFAR-10 and 20Newsgroup. Figure 7 shows similar curves of zero-
+one loss for TIMIT and SVHN. The random feature vectors v1,...,v N are sampled independently
+fromN (0,σ−2·I), the mean-zero normal distribution in Rd with covarianceσ−2·I. The bandwidth
+parameterσ is set to 5, 5, 5, 0.1, and 16 for MNIST, SVHN, CIFAR-10, 20-Newsgroup, and TIMIT,
+respectively.
+C.2 Random ReLU Feature models
+We show that the double descent risk curve also appears with Random ReLU feature networks [12].
+Such networks are similar to the RFF models, except that they use the ReLU transfer function.
+Speciﬁcally, the Random ReLU features model familyHN withN parameters consists of functions
+18
+h: Rd→ R of the form
+h(x) =
+N∑
+k=1
+akφ(x;vk) where φ(x;v) := max(⟨v,x⟩, 0).
+The vectors v1,...,v N are sampled independently from uniform distribution over surface of unit
+sphere in Rd. The coeﬃcients ak are learned using linear regression. Figure 8 illustrates zero-one
+loss with Random ReLU features for MNIST and SVHN data. Ridge regularization with parameter
+λ := 4· 10−6 is added in SVHN experiments to ensure numerical stability near the interpolation
+threshold. For MNIST experiments, no regularization is added. We observe that the resulting risk
+curves and the norm curves are very similar to those for RFF.
+C.3 Fully connected neural networks
+In our experiments, we use fully connected neural networks with a single hidden layer. To control
+the capacity of function class, we vary the number of hidden units. We use stochastic gradient
+descent (SGD) to solve the ERM optimization problem in this setting.
+The ERM optimization problem in this setting is generally more diﬃcult than that for RFF
+and ReLU feature models due to a lack of analytical solutions and non-convexity of the problem.
+Consequently, SGD is known to be sensitive to initialization. To mitigate this sensitivity, we
+use a “weight reuse” scheme with SGD in the under-parametrized regime ( N < n), where the
+parameters obtained from training a smaller neural network are used as initialization for training
+larger networks. This procedure, detailed below, ensures decreasing training risk as the number
+of parameters increases. In the over-parametrized regime ( N ≥ n), we use standard (random)
+initialization, as typically there is no diﬃculty in obtaining near-zero training risk.
+Additional experimental results for neural networks are shown in Figure 9. Results for MNIST
+and CIFAR-10 with weight reuse are reported in Figure 9(a) and Figure 9(b). Results for MNIST
+without weight reuse are reported in Figure 9(c). In this setting, all models are randomly initialized.
+While the variance is signiﬁcantly larger, and the training loss is not monotonically decreasing, the
+double descent behavior is still clearly discernible.
+We now provide speciﬁc details below. We use SGD with standard momentum (parameter
+value 0.95) implemented in [13] for training. In the weight reuse scheme, we assume that we have
+already trained a smaller network with H1 hidden units. To train a larger network with H2 >H 1
+hidden units, we initialize the ﬁrst H1 hidden units of the larger network to the weights learned
+in the smaller network. The remaining weights are initialized with normally distributed random
+numbers (mean 0 and variance 0 .01). The smallest network is initialized using standard Glorot-
+uniform distribution [19]. For networks smaller than the interpolation threshold, we decay the
+step size by 10% after each of 500 epochs, where an epoch denotes a pass through the training
+data. For these networks, training is stopped after classiﬁcation error reached zero or 6000 epochs,
+whichever happens earlier. For networks larger than interpolation threshold, ﬁxed step size is used,
+and training is stopped after 6000 epochs.
+C.4 Synthetic model
+We now discuss the nature of the double descent risk curve in the context of a simple synthetic
+model, which can be viewed as a version of RFF for functions on the one-dimensional circle.
+Consider the classH of periodic complex-valued functions on the interval [0 , 2π], and let
+ek(x) := exp(
+√
+−1(k−1)x)
+19
+0
+20
+40
+60
+Zero-one loss (%)
+MNIST (n = 4 103, d = 784, K = 10)
+Test
+Train
+3 10 40 100 300 800
+Number of parameters/weights (×103)
+0.0
+0.2
+0.4
+0.6Squared loss 
+Test
+Train
+0
+10
+20
+30
+40
+Zero-one loss (%)
+CIFAR-10 (n = 960, d = 64, K = 2)
+Test
+Train
+50 400 2000 10000 50000 650000
+Number of parameters/weights 
+0.0
+0.5
+1.0
+1.5Squared loss 
+Test
+Train
+0
+5
+10
+15
+20
+25
+Zero-one loss (%)
+MNIST (n = 4 103, d = 784, K = 10)
+Test
+Train
+14 40 100 300 800
+Number of parameters/weights (×103)
+0.0
+0.1
+0.2
+0.3
+0.4Squared loss 
+Test
+Train
+(a) (b) (c)
+Figure 9: Double descent risk curve for fully connected neural networks. In each plot,
+we use a dataset with n subsamples of d dimension and K classes for training. We use networks
+with a single hidden layer. For network with H hidden units, its number of parameters is ( d + 1)·
+H + (H + 1)·K. The interpolation threshold is observed at n·K and is marked by black dotted
+line in ﬁgures. ( a) Weight reuse before interpolation threshold and random initialization after it
+on MNIST. ( b) Same, on a subset of CIFAR-10 with 2 classes (cat, dog) and downsampled image
+features (8× 8). ( c) No weight reuse (random initialization for all ranges of parameters).
+for positive integers k. Fix a probability distribution p = (p1,p 2,... ) on the positive integers. For
+each integerN, we generate a random function classHN by (i) sampling independently fromp until
+N distinct indices k1,...,k N are chosen, and then (ii) let HN be the linear span of ek1,...,e kN .
+Here, N is the number of parameters to specify a function in HN and also reﬂects the capacity of
+HN.
+We generate data from the following model:
+yi =h∗(xi) +εi
+where the target functionh∗ = ∑ kα∗ kek is in the span of theek, andε1,...,ε n are independent zero-
+mean normal random variables with variance σ2. The x1,...,x n themselves are drawn uniformly
+at random from {2πj/M : j = 0,...,M − 1} for M := 4096. We also let α∗ k := pk for all k, with
+pk∝ 1/k2. The signal-to-noise ratio (SNR) is E[h∗(xi)2]/σ2.
+Given data (x1,y 1),..., (xn,y n)∈ [0, 2π]×R, we learn a function from the function classHN us-
+ing empirical risk minimization, which is equivalent to ordinary least squares over anN-dimensional
+space. Interpolation is achieved whenN≥n, so in this regime, we choose the interpolating function
+h = ∑N j=1αkjekj of smallest (squared) norm ‖h‖2 H = ∑ kα2 k/pk.
+Our simulations were carried out for a variety of sample sizes (n∈{ 26, 27,..., 211}) and are all
+repeated independently 20 times; our plots show averages over the 20 trials. The results conﬁrm
+our hypothesized double descent risk curve, as shown in Figure 10 for n = 256; the results are
+similar for other n. The peak occurs at N =n, and the right endpoint of the curve is lower than
+the bottom of the U curve. The norm of the learned function also peaks at N =n and decreases
+for N >n.
+20
+100
+10-1
+10-2
+Squared loss
+0 250 500 750 1000 1250 1500
+102
+103
+104
+105
+Norm
+Number of parameters ( N)
+SNR = ∞, n = 256
+101
+100
+10-1
+10-2
+Squared loss
+0 250 500 750 1000 1250 1500
+101
+103
+105
+Norm
+Number of parameters ( N)
+SNR = 20, n = 256
+Figure 10: Results from the synthetic model at SNR = ∞ and SNR = 20. Top: excess
+test risk under squared loss of learned function. Bottom: norm of learned function ‖h‖H∞. For
+n = 256 training samples, the interpolation threshold is reached at N = 256.
+0.00
+0.02
+0.04
+Squared loss
+Test
+Train
+10/1 1000/1 2000/1
+0
+10
+20
+30
+Zero-one loss (%)
+2000/10 2000/20
+Model parameters: Nmax leaf / Ntree
+MNIST (n = 10 4, 10 classes)
+0.00
+0.05
+0.10
+0.15
+Squared loss
+Test
+Train
+10/1 1800/1 3600/1
+0
+20
+40
+60
+80
+Zero-one loss (%)
+3600/10 3600/20
+Model parameters: Nmax leaf / Ntree
+SVHN (n = 10 4, 10 classes)
+0.00
+0.01
+0.02
+Squared loss
+Test
+Train
+2/1 2500/1 5000/1
+0
+25
+50
+75
+100
+Zero-one loss (%)
+5000/10 5000/20
+Model parameters: Nmax leaf / Ntree
+TIMIT (n = 10 4, 48 classes)
+(a)
+0.00
+0.02
+0.04
+0.06
+Squared loss
+Test
+Train
+10/1 750/1 1500/1
+0
+10
+20
+30
+40
+Zero-one loss (%)
+1500/10 1500/20
+Model parameters: Nmax leaf / Ntree
+0.00
+0.05
+0.10
+0.15
+Squared loss
+Test
+Train
+10/1 1250/1 2500/1
+0
+20
+40
+60
+80
+Zero-one loss (%)
+2500/10 2500/20
+Model parameters: Nmax leaf / Ntree
+0.00
+0.01
+0.02
+Squared loss
+Test
+Train
+2/1 1800/1 3600/1
+0
+25
+50
+75
+100
+Zero-one loss (%)
+3600/10 3600/20
+Model parameters: Nmax leaf / Ntree
+(b)
+Figure 11: Double descent risk curve for random forests. In all plots, the double descent
+risk curve is observed for random forest with increasing model complexity on regression tasks. Its
+complexity is controlled by the number of trees Ntree and the maximum number of leaves allowed
+for each tree N max leaf . ( a) Without bootstrap re-sampling, a single tree can interpolate the training
+data. ( b) With bootstrap re-sampling, multiple trees are needed to interpolate the data.
+21
+0.00
+0.02
+0.04
+0.06
+Squared loss
+Test
+Train
+1/1 25/1 50/1
+0
+10
+20
+30
+Zero-one loss (%)
+50/10 50/20
+Model parameters: Ntree / Nforest
+MNIST (n = 10 4, 10 classes)
+0.00
+0.05
+0.10
+0.15
+Squared loss
+Test
+Train
+1/1 50/1 100/1
+0
+20
+40
+60
+80
+Zero-one loss (%)
+100/10 100/20
+Model parameters: Ntree / Nforest
+SVHN (n = 10 4, 10 classes)
+Figure 12: Double descent risk curve for L2-boosting trees. In both plots, we increase the
+model complexity by ﬁrst increasing the number of boosting (random) trees ( Ntree) which form a
+forest, then averaging several such forests (Nforest). Each tree is constrained to have no more than
+10 leaves. For fast interpolation, the gradient boosting is applied with low shrinkage parameter
+(0.85).
+D Additional results with Random Forests
+We train standard random forests introduced by Breiman [9] for regression problems. When split-
+ting a node, we randomly select a subset of features whose number is the square root of the number
+of the total features, a setting which is widely used in mainstream implementations of random
+forest. We control the capacity of the model class by choosing the number of trees ( Ntree) and
+limiting the maximum number of leaves in each tree ( N max leaf ). We put minimum constraints on the
+growth of each tree: there is no limit for the tree depth and we split each tree node whenever it is
+possible.
+To interpolate the training data, we disable the bootstrap re-sampling for results in Figure 11(a),
+which has been investigated under the name “Perfect random tree ensembles” by Cutler et al. [14].
+We see clear double decent risk curve (with both squared loss and zero-one loss) as we increase the
+capacity of the model class (although the U-shaped curve is less apparent with zero-one loss). In
+Figure 11(b), we run the same experiments with bootstrap re-sampling enabled, which show similar
+double decent risk curves.
+E Results with L2-boosting
+We now show double descent risk curve forL2-boosting (random) trees introduced by Friedman [15].
+When splitting a node in a tree, we randomly select a subset of features whose number is the square
+root of the number of the total features. We constrain each tree to have a small number of leaves
+(no more than 10). As the number of trees increases, the boosted trees gradually interpolate the
+training data and form a forest. To quickly reach interpolation, we adopt low shrinkage (param-
+eter value 0.85) for gradient boosting. To go beyond the interpolation threshold, we average the
+predictions of several such forests which are randomly constructed and trained with exactly same
+22
+hyper-parameters. The capacity of our model is hence controlled by the number of forests ( Nforest)
+and the number of trees (Ntree) in each forest.
+Figure 12 shows the change of train and test risk as the model capacity increases. We see the
+double descent risk curve for both squared loss and zero-one loss. We also observe strong over-
+ﬁtting under squared loss before the interpolation threshold. For similar experiments with high
+shrinkage (parameter value 0.1), the double descent risk curve becomes less apparent due to the
+regularization eﬀect of high shrinkage [21].
+23
